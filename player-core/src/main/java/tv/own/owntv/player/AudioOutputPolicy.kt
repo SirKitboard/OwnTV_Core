@@ -96,6 +96,9 @@ object AudioOutputPolicy {
  * Audio decoders: the device's MediaCodec ones first, then — with the FFmpeg audio setting on — FFmpeg
  * ([FfmpegAudio]) for what the chip cannot decode. Never FFmpeg first — it would software-decode AAC and
  * take passthrough away.
+ *
+ * Video: Media3's renderer, as [OwnTVVideoRenderer] — it drops the AUD-only H.264 samples the live TS
+ * flags produce, which freeze MediaTek's hardware decoder.
  */
 @UnstableApi
 class OwnTVRenderersFactory(
@@ -129,23 +132,21 @@ class OwnTVRenderersFactory(
             context, extensionRendererMode, mediaCodecSelector, enableDecoderFallback,
             eventHandler, eventListener, allowedVideoJoiningTimeMs, out,
         )
-        if (!onSurfaceOnly) return
         val i = out.indexOfFirst { it is MediaCodecVideoRenderer }
         if (i < 0) return
         // Built as DefaultRenderersFactory builds its own; the options it adds are ones this factory never sets.
-        out[i] = OnSurfaceVideoRenderer(
-            MediaCodecVideoRenderer.Builder(context)
-                .setCodecAdapterFactory(codecAdapterFactory)
-                .setMediaCodecSelector(mediaCodecSelector)
-                .setAllowedJoiningTimeMs(allowedVideoJoiningTimeMs)
-                .setEnableDecoderFallback(enableDecoderFallback)
-                .setEventHandler(eventHandler)
-                .setEventListener(eventListener)
-                .setMaxDroppedFramesToNotify(MAX_DROPPED_VIDEO_FRAME_COUNT_TO_NOTIFY),
-        )
+        val builder = MediaCodecVideoRenderer.Builder(context)
+            .setCodecAdapterFactory(codecAdapterFactory)
+            .setMediaCodecSelector(mediaCodecSelector)
+            .setAllowedJoiningTimeMs(allowedVideoJoiningTimeMs)
+            .setEnableDecoderFallback(enableDecoderFallback)
+            .setEventHandler(eventHandler)
+            .setEventListener(eventListener)
+            .setMaxDroppedFramesToNotify(MAX_DROPPED_VIDEO_FRAME_COUNT_TO_NOTIFY)
+        out[i] = if (onSurfaceOnly) OnSurfaceVideoRenderer(builder) else OwnTVVideoRenderer(builder)
     }
 
-    private class OnSurfaceVideoRenderer(builder: MediaCodecVideoRenderer.Builder) : MediaCodecVideoRenderer(builder) {
+    private class OnSurfaceVideoRenderer(builder: MediaCodecVideoRenderer.Builder) : OwnTVVideoRenderer(builder) {
         // Only a codec still to be started is refused the stand-in: a running one keeps being moved, because
         // releasing it instead costs a black screen until the next keyframe (up to 2 s measured on the TCL).
         override fun shouldUsePlaceholderSurface(codecInfo: MediaCodecInfo): Boolean =
