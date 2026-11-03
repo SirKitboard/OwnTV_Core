@@ -71,6 +71,20 @@ class LiveStreamQuirksTest {
     }
 
     @Test
+    fun `ffmpeg re-reading a short playlist at EOF is recognised`() {
+        // Verbatim shape from the traced mpv-only failure (a 222-byte manifest behind a `.ts` URL).
+        assertEquals(222L, LiveStreamQuirks.eofReconnectOffset("http: Will reconnect at 222 in 0 second(s), error=End of file."))
+    }
+
+    @Test
+    fun `other reconnects and big offsets are not a playlist loop`() {
+        assertNull(LiveStreamQuirks.eofReconnectOffset("http: Will reconnect at 222 in 1 second(s), error=Connection reset by peer."))
+        assertNull(LiveStreamQuirks.eofReconnectOffset("http: Will reconnect at 9000000 in 0 second(s), error=End of file."))
+        assertNull(LiveStreamQuirks.eofReconnectOffset("http: Will reconnect at 0 in 0 second(s), error=End of file."))
+        assertNull(LiveStreamQuirks.eofReconnectOffset("http: HTTP error 404 Not Found"))
+    }
+
+    @Test
     fun `a different provider is unaffected by what one panel taught us`() {
         LiveStreamQuirks.rememberHlsRedirect("http://panel.example:80/live/u/p/1.ts")
         assertFalse(LiveStreamQuirks.isKnownHlsHost("http://other.example:80/live/u/p/1.ts"))

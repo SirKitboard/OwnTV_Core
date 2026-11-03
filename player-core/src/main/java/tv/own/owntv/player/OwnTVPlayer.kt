@@ -1376,6 +1376,7 @@ class OwnTVPlayer(
             val t = text.trim()
             if (t.isEmpty()) return
             if (isLiveContent && BROKEN_PTS_RX.containsMatchIn(t)) noteBrokenTimestamp()
+            if (isLiveContent) LiveStreamQuirks.eofReconnectOffset(t)?.let(::noteEofReconnect)
             // A broken-timestamp warning says "invalid", but it is a per-frame symptom, not a failure: kept, it
             // was a diagnostics write on nearly every frame of such a feed and became the load's error reason.
             val keep = level <= 20 /* error/fatal */ ||
@@ -1398,6 +1399,35 @@ class OwnTVPlayer(
         }
     }
 
+
+    /**
+     * FFmpeg hit EOF on a live `.ts` open and is about to re-read it from [offset]. Seen
+     * [LiveStreamQuirks.EOF_LOOP_HITS] times at the same offset before the file opens, the response is a
+     * manifest the panel redirected to, not a TS feed: learn the host as HLS and reopen this channel once,
+     * so [streamLavfOptionsFor] drops `reconnect_at_eof`. Before this, only ExoPlayer taught the lesson,
+     * so mpv-first tunes re-read the playlist until the 10 s open timeout.
+     */
+    private fun noteEofReconnect(offset: Long) {
+        val l = load
+        if (l.fileLoaded || !l.expectingPlayback || item.reopenedAsHls) return
+        if (offset != l.eofLoopOffset) {
+            l.eofLoopOffset = offset
+            l.eofLoopHits = 0
+        }
+        if (++l.eofLoopHits < LiveStreamQuirks.EOF_LOOP_HITS) return
+        val url = currentUrl ?: return
+        if (LiveStreamQuirks.isKnownHlsHost(url)) return // already opened as HLS; nothing new to learn
+        LiveStreamQuirks.rememberHlsRedirect(url)
+        // A mixed panel refuses the host lesson; reopening would only repeat the same loop.
+        if (!LiveStreamQuirks.isKnownHlsHost(url)) return
+        item.reopenedAsHls = true
+        LiveDiagnosticsLog.event("mpv re-read a ${offset}-byte response at EOF ${l.eofLoopHits}× — treating host as HLS and reopening")
+        val gen = loadGeneration
+        scope.launch {
+            if (gen != loadGeneration || currentUrl != url) return@launch
+            reloadLive(url, resetRetries = false)
+        }
+    }
 
     /**
      * mpv complained about this live feed's timestamps. Past [BROKEN_PTS_HITS] that is the pathological
@@ -5577,6 +5607,10 @@ internal data class LoadState(
     /** Broken-timestamp detection. Touched from mpv's log thread. */
     @field:Volatile var brokenPtsHits: Int = 0,
     @field:Volatile var brokenPtsHandled: Boolean = false,
+    /** FFmpeg's `reconnect_at_eof` re-reading one short response during the open (a manifest behind a
+     *  `.ts` URL). Touched from mpv's log thread; see [LiveStreamQuirks.eofReconnectOffset]. */
+    @field:Volatile var eofLoopOffset: Long = -1L,
+    @field:Volatile var eofLoopHits: Int = 0,
     var expectingPlayback: Boolean = false,
     var pendingSeekMs: Long = 0L,
     /** Decode watchdog: if a >1080p video ends up on the software decoder, playback is aborted with a
@@ -5611,6 +5645,9 @@ internal data class ItemState(
      *  catch-up archive the opposite, a panel whose live edge remuxes to HLS while its timeshift server
      *  only ever has `.ts` on disk. */
     @field:Volatile var triedAltFormat: Boolean = false,
+    /** This item already reopened once as HLS after mpv caught the playlist EOF loop. One shot, so a
+     *  panel that keeps looping falls through to the open timeout instead of reloading forever. */
+    @field:Volatile var reopenedAsHls: Boolean = false,
     /** The catch-up `timeshift.php` query form - a SEPARATE alternate from the extension swap, for the
      *  panels that reject the path-style archive URL outright. Sharing one flag with [triedAltFormat]
      *  meant whichever alternate ran first consumed the other's turn. */

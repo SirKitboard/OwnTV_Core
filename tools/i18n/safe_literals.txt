@@ -5900,6 +5900,7 @@
 2	protocol	player-core/src/main/java/tv/own/owntv/player/LiveStreamQuirks.kt	.m3u8
 1	protocol	player-core/src/main/java/tv/own/owntv/player/LiveStreamQuirks.kt	.ts
 1	protocol	player-core/src/main/java/tv/own/owntv/player/LiveStreamQuirks.kt	://
+1	regex	player-core/src/main/java/tv/own/owntv/player/LiveStreamQuirks.kt	Will reconnect at (\\d+) in .*End of file
 1	log	player-core/src/main/java/tv/own/owntv/player/LiveTuneController.kt	$reason — gave up after ${armedBudgetMs / 1000}s
 1	technical	player-core/src/main/java/tv/own/owntv/player/LiveTuneController.kt	${channel.sourceId}:${channel.id}
 1	log	player-core/src/main/java/tv/own/owntv/player/LiveTuneController.kt	'${channel.name}' falling back to $label ($reason)
@@ -6231,6 +6232,7 @@
 1	log	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	mpv live mid-play reconnects exhausted ($MAX_LIVE_RECONNECTS) — surfacing error
 1	log	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	mpv live open timed out after ${openingMs}ms — surfacing error
 1	log	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	mpv load waits for a fresh surface (previous item ${lastVideoHeightPx}p)
+1	log	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	mpv re-read a ${offset}-byte response at EOF ${l.eofLoopHits}× — treating host as HLS and reopening
 1	log	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	mpv ready: ${getPropertyString("mpv-version")} ffmpeg=${getPropertyString("ffmpeg-version")}
 1	log	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	mpv reported ${load.brokenPtsHits} broken video timestamps — switching to free-running video timing
 1	log	player-core/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt	mpv surface attached in ${android.os.SystemClock.elapsedRealtime() - t0}ms, pending load=$pendingLoad

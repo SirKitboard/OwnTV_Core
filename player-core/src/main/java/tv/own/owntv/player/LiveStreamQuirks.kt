@@ -156,6 +156,27 @@ object LiveStreamQuirks {
     }
 
     /**
+     * The offset in FFmpeg's `reconnect_at_eof` line ("http: Will reconnect at 222 in 0 second(s),
+     * error=End of file."), or null for any other line.
+     *
+     * mpv learns a redirecting panel from this line. A live `.ts` that the panel redirects to a manifest
+     * is a short, finite response. Opened as raw TS, `reconnect_at_eof` re-reads the same few hundred
+     * bytes until the open times out. Before this, only ExoPlayer taught [rememberHlsRedirect], so with
+     * mpv as the only engine every redirected channel failed. Offsets above [MAX_EOF_LOOP_OFFSET] are
+     * ignored: a feed that delivered that much was a stream that dropped, not a playlist.
+     */
+    fun eofReconnectOffset(line: String): Long? {
+        val offset = EOF_RECONNECT_RX.find(line)?.groupValues?.get(1)?.toLongOrNull() ?: return null
+        return offset.takeIf { it in 1..MAX_EOF_LOOP_OFFSET }
+    }
+
+    /** Same-offset EOF reconnects during one open before mpv treats the response as a manifest. */
+    const val EOF_LOOP_HITS = 3
+    private const val MAX_EOF_LOOP_OFFSET = 64L * 1024
+    private val EOF_RECONNECT_RX =
+        Regex("""Will reconnect at (\d+) in .*End of file""", RegexOption.IGNORE_CASE)
+
+    /**
      * Record that [url]'s host serves DASH manifests from URLs that do not say `.mpd` (v43).
      *
      * The DASH twin of [rememberHlsRedirect], and it matters for the same reason: the traced proxy
