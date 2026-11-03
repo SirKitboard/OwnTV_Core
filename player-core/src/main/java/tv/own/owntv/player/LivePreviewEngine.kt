@@ -1415,6 +1415,7 @@ class LivePreviewEngine(
             val rungInput = LiveStartRungs.Input(
                 containerUnsupported = error.errorCode == PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED,
                 formatFailure = isFormatFailure(error),
+                httpStatus = http,
                 decoderFailure = isDecoderFailure(error),
                 decoderExhausted = isDecoderExhausted(error),
                 identityRefusal = http?.let { LiveStreamQuirks.isIdentityRefusal(it) } == true,

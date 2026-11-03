@@ -156,6 +156,17 @@ object LiveStreamQuirks {
     }
 
     /**
+     * Whether a failed HLS open (one chosen because of the panel lesson) proves *this* channel is plain TS,
+     * so [forgetHlsRedirect] is warranted. Only a response that arrived and would not parse says that. An
+     * HTTP status says nothing about the format: an offline channel on a redirecting panel 404s on its
+     * manifest whatever it is asked for, and taking that as "plain TS" put the panel on the mixed list for
+     * the rest of the session — after which mpv opened every redirected `.ts` with `reconnect_at_eof` and
+     * re-read the same playlist until its open timed out, on every channel.
+     */
+    fun disprovesHlsLesson(isFormatFailure: Boolean, httpStatus: Int?): Boolean =
+        isFormatFailure && httpStatus == null
+
+    /**
      * Record that [url]'s host serves DASH manifests from URLs that do not say `.mpd` (v43).
      *
      * The DASH twin of [rememberHlsRedirect], and it matters for the same reason: the traced proxy

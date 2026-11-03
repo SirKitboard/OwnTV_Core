@@ -71,6 +71,22 @@ class LiveStreamQuirksTest {
     }
 
     @Test
+    fun `only a response that would not parse disproves the host lesson`() {
+        // The manifest parser choked on what came back: this channel really is plain TS.
+        assertTrue(LiveStreamQuirks.disprovesHlsLesson(isFormatFailure = true, httpStatus = null))
+        // Not a format failure at all (a timeout, a decoder error): says nothing either way.
+        assertFalse(LiveStreamQuirks.disprovesHlsLesson(isFormatFailure = false, httpStatus = null))
+    }
+
+    @Test
+    fun `an offline channel's 404 leaves a redirecting panel's lesson alone`() {
+        // The traced case: a dead channel on a redirecting panel 404s on its manifest. Counting that as
+        // "plain TS" put the panel on the mixed list, and every mpv channel after it timed out.
+        assertFalse(LiveStreamQuirks.disprovesHlsLesson(isFormatFailure = true, httpStatus = 404))
+        assertFalse(LiveStreamQuirks.disprovesHlsLesson(isFormatFailure = true, httpStatus = 415))
+    }
+
+    @Test
     fun `a different provider is unaffected by what one panel taught us`() {
         LiveStreamQuirks.rememberHlsRedirect("http://panel.example:80/live/u/p/1.ts")
         assertFalse(LiveStreamQuirks.isKnownHlsHost("http://other.example:80/live/u/p/1.ts"))
